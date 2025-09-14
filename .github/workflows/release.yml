@@ -327,3 +327,22 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+      - name: Use PAT for cross-repo access (optional)
+        shell: bash
+        env:
+          DEFAULT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          TOK="$DEFAULT_TOKEN"; if [ -n "$TAP_TOKEN" ]; then TOK="$TAP_TOKEN"; fi
+          echo "GH_TOKEN=${TOK}" >> $GITHUB_ENV
+          echo "GITHUB_TOKEN=${TOK}" >> $GITHUB_ENV
+      - name: Install cached dist
+        uses: actions/download-artifact@v4
+        with:
+          name: cargo-dist-cache
+          path: ~/.cargo/bin/
+      - run: chmod +x ~/.cargo/bin/dist
+      - name: Publish Homebrew Tap PR
+        run: |
+          # Use the release tag computed in plan
+          dist publish ${{ needs.plan.outputs.tag-flag }} --installer homebrew
