@@ -14,10 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install cargo-dist
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-dist
+      - name: Install jq and cargo-dist
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          cargo install cargo-dist --locked
       - id: plan
         run: |
           cargo dist plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
@@ -40,6 +41,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install build deps (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm-dev libclang-dev pkg-config
       - name: Install cargo-dist
         uses: taiki-e/install-action@v2
         with:
@@ -73,3 +79,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cargo dist upload --tag ${{ github.ref_name }} target/distrib/*
+
+  publish-tap:
+    needs: [plan, upload]
+    runs-on: ubuntu-latest
+    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-dist@${{ needs.plan.outputs.dist-version }}
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          merge-multiple: true
+      - name: Publish Homebrew Tap PR
+        env:
+          # Personal Access Token with access to panghy/homebrew-tap
+          GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          cargo dist publish --installer homebrew --tag ${{ github.ref_name }}
