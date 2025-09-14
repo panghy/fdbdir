@@ -21,7 +21,10 @@ dirs = "=5.0.1"
 # Local path to foundationdb-rs crates
 foundationdb = { version = "=0.9.2", features = ["fdb-7_1", "embedded-fdb-include"] }
 
-[package.metadata.dist]
+[workspace]
+members = [ "." ]
+
+[workspace.metadata.dist]
 cargo-dist-version = "0.10.0"
 targets = [
   "aarch64-apple-darwin",

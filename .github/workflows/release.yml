@@ -44,7 +44,7 @@ jobs:
           $DIST_CMD --version
       - id: plan
         run: |
-          $DIST_CMD plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
+          $DIST_CMD plan --output-format json > dist-plan.json
           echo "dist-version=$(jq -r .dist_version dist-plan.json)" >> $GITHUB_OUTPUT
           echo "tasks=$(jq -c .tasks dist-plan.json)" >> $GITHUB_OUTPUT
 
