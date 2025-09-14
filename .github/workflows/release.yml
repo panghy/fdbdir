@@ -14,14 +14,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install jq and cargo-dist
+      - name: Install jq
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
-          cargo install cargo-dist --locked
+      - name: Install cargo-dist (prebuilt)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-dist
       - id: plan
         run: |
-          cargo dist plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
+          cargo-dist plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
           echo "dist-version=$(jq -r .dist_version dist-plan.json)" >> $GITHUB_OUTPUT
           echo "tasks=$(jq -c .tasks dist-plan.json)" >> $GITHUB_OUTPUT
 
@@ -46,13 +49,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang llvm-dev libclang-dev pkg-config
-      - name: Install cargo-dist
+      - name: Install cargo-dist (prebuilt)
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-dist@${{ needs.plan.outputs.dist-version }}
       - name: Build Artifacts
         run: |
-          cargo dist build --target ${{ matrix.target }} --tag ${{ github.ref_name }}
+          cargo-dist build --target ${{ matrix.target }} --tag ${{ github.ref_name }}
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -79,7 +82,7 @@ jobs:
           # GitHub-provided token for this repo
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          cargo dist upload --tag ${{ github.ref_name }} target/distrib/*
+          cargo-dist upload --tag ${{ github.ref_name }} target/distrib/*
 
   publish-tap:
     needs: [plan, upload]
@@ -106,4 +109,4 @@ jobs:
         run: |
           # Prefer TAP_TOKEN if provided
           if [ -n "${TAP_TOKEN}" ]; then export GITHUB_TOKEN="${TAP_TOKEN}"; fi
-          cargo dist publish --installer homebrew --tag ${{ github.ref_name }}
+          cargo-dist publish --installer homebrew --tag ${{ github.ref_name }}
