@@ -22,6 +22,14 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-dist
+      - name: Ensure cargo-dist available
+        run: |
+          echo "PATH=$PATH"
+          if ! command -v cargo-dist >/dev/null 2>&1; then
+            echo "cargo-dist not found; installing via cargo";
+            cargo install cargo-dist --locked;
+          fi
+          cargo-dist --version
       - id: plan
         run: |
           cargo-dist plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
@@ -53,6 +61,12 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-dist@${{ needs.plan.outputs.dist-version }}
+      - name: Ensure cargo-dist available
+        run: |
+          if ! command -v cargo-dist >/dev/null 2>&1; then
+            cargo install cargo-dist --locked;
+          fi
+          cargo-dist --version
       - name: Build Artifacts
         run: |
           cargo-dist build --target ${{ matrix.target }} --tag ${{ github.ref_name }}
@@ -72,6 +86,12 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-dist@${{ needs.plan.outputs.dist-version }}
+      - name: Ensure cargo-dist available
+        run: |
+          if ! command -v cargo-dist >/dev/null 2>&1; then
+            cargo install cargo-dist --locked;
+          fi
+          cargo-dist --version
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -95,6 +115,12 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-dist@${{ needs.plan.outputs.dist-version }}
+      - name: Ensure cargo-dist available
+        run: |
+          if ! command -v cargo-dist >/dev/null 2>&1; then
+            cargo install cargo-dist --locked;
+          fi
+          cargo-dist --version
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
