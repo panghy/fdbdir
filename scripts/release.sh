@@ -15,10 +15,10 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   exit 1
 fi
 
-# Bump version in Cargo.toml [package] only (portable awk)
+# Bump version in Cargo.toml [package] only
 awk -v ver="$VERSION_INPUT" '
   BEGIN { inpkg=0 }
-  /^\\[package\]/ { inpkg=1; print; next }
+  /^\[package\]/ { inpkg=1; print; next }
   /^\[/ { if (inpkg) inpkg=0; print; next }
   inpkg && /^version *= *"[^"]+"/ { sub(/version *= *"[^"]+"/, "version = \"" ver "\""); print; next }
   { print }
@@ -31,4 +31,3 @@ git tag "${TAG}"
 
 echo "Created tag ${TAG}. Push with:"
 echo "  git push && git push --tags"
-
