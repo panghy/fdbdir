@@ -1,0 +1,75 @@
+name: Release (cargo-dist)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      dist-version: ${{ steps.plan.outputs.dist-version }}
+      tasks: ${{ steps.plan.outputs.tasks }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-dist
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-dist
+      - id: plan
+        run: |
+          cargo dist plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
+          echo "dist-version=$(jq -r .dist_version dist-plan.json)" >> $GITHUB_OUTPUT
+          echo "tasks=$(jq -c .tasks dist-plan.json)" >> $GITHUB_OUTPUT
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-dist
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-dist@${{ needs.plan.outputs.dist-version }}
+      - name: Build Artifacts
+        run: |
+          cargo dist build --target ${{ matrix.target }} --tag ${{ github.ref_name }}
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.target }}
+          path: target/distrib/*
+
+  upload:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-dist@${{ needs.plan.outputs.dist-version }}
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          merge-multiple: true
+      - name: Upload to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cargo dist upload --tag ${{ github.ref_name }} target/distrib/*
