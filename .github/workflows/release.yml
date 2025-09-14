@@ -136,6 +136,10 @@ jobs:
           pattern: artifacts-*
           path: target/distrib/
           merge-multiple: true
+      - name: Set up FoundationDB
+        uses: foundationdb-rs/foundationdb-actions-install@v2.3.0
+        with:
+          version: '7.3.69'
       - name: Install dependencies
         run: |
           ${{ matrix.packages_install }}
