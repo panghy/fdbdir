@@ -76,7 +76,8 @@ jobs:
           merge-multiple: true
       - name: Upload to Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GitHub-provided token for this repo
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           cargo dist upload --tag ${{ github.ref_name }} target/distrib/*
 
@@ -98,11 +99,11 @@ jobs:
           merge-multiple: true
       - name: Publish Homebrew Tap PR
         env:
-          # Personal Access Token with access to panghy/homebrew-tap
-          GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # Default repo token (works if tap is same owner and permissions suffice)
+          GITHUB_TOKEN: ${{ github.token }}
+          # Optional PAT for cross-repo write; if present will override GITHUB_TOKEN below.
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          if [ -z "${GITHUB_TOKEN}" ]; then
-            echo "HOMEBREW_TAP_TOKEN not set; skipping tap publish";
-            exit 0;
-          fi
+          # Prefer TAP_TOKEN if provided
+          if [ -n "${TAP_TOKEN}" ]; then export GITHUB_TOKEN="${TAP_TOKEN}"; fi
           cargo dist publish --installer homebrew --tag ${{ github.ref_name }}
