@@ -27,19 +27,24 @@ jobs:
           echo "PATH=$PATH"
           CARGO_BIN_DIR="${CARGO_HOME:-$HOME/.cargo}/bin"
           CARGO_DIST="$CARGO_BIN_DIR/cargo-dist"
-          if ! command -v cargo-dist >/dev/null 2>&1 && [ ! -x "$CARGO_DIST" ]; then
-            echo "cargo-dist not found; installing via cargo --force";
+          DIST_BIN="$CARGO_BIN_DIR/dist"
+          # Prefer prebuilt 'dist' from binstall/install-action
+          if command -v dist >/dev/null 2>&1; then DIST_CMD="dist"; fi
+          if [ -x "$DIST_BIN" ]; then DIST_CMD="$DIST_BIN"; fi
+          # If cargo-dist exists use that
+          if command -v cargo-dist >/dev/null 2>&1; then DIST_CMD="cargo-dist"; fi
+          if [ -x "$CARGO_DIST" ]; then DIST_CMD="$CARGO_DIST"; fi
+          # If nothing found, install via cargo and use resulting 'dist'
+          if [ -z "${DIST_CMD:-}" ]; then
+            echo "No cargo-dist or dist found; installing via cargo --force";
             cargo install cargo-dist --force --locked;
+            if [ -x "$DIST_BIN" ]; then DIST_CMD="$DIST_BIN"; else DIST_CMD="dist"; fi
           fi
-          if [ ! -x "$CARGO_DIST" ]; then
-            # Fallback to whatever is on PATH (if any)
-            CARGO_DIST="$(command -v cargo-dist || true)"
-          fi
-          echo "CARGO_DIST=$CARGO_DIST" >> $GITHUB_ENV
-          "$CARGO_DIST" --version
+          echo "DIST_CMD=$DIST_CMD" >> $GITHUB_ENV
+          $DIST_CMD --version
       - id: plan
         run: |
-          ${{ env.CARGO_DIST }} plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
+          $DIST_CMD plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
           echo "dist-version=$(jq -r .dist_version dist-plan.json)" >> $GITHUB_OUTPUT
           echo "tasks=$(jq -c .tasks dist-plan.json)" >> $GITHUB_OUTPUT
 
@@ -72,15 +77,17 @@ jobs:
         run: |
           CARGO_BIN_DIR="${CARGO_HOME:-$HOME/.cargo}/bin"
           CARGO_DIST="$CARGO_BIN_DIR/cargo-dist"
-          if ! command -v cargo-dist >/dev/null 2>&1 && [ ! -x "$CARGO_DIST" ]; then
-            cargo install cargo-dist --force --locked;
-          fi
-          if [ ! -x "$CARGO_DIST" ]; then CARGO_DIST="$(command -v cargo-dist || true)"; fi
-          echo "CARGO_DIST=$CARGO_DIST" >> $GITHUB_ENV
-          "$CARGO_DIST" --version
+          DIST_BIN="$CARGO_BIN_DIR/dist"
+          if command -v dist >/dev/null 2>&1; then DIST_CMD="dist"; fi
+          if [ -x "$DIST_BIN" ]; then DIST_CMD="$DIST_BIN"; fi
+          if command -v cargo-dist >/dev/null 2>&1; then DIST_CMD="cargo-dist"; fi
+          if [ -x "$CARGO_DIST" ]; then DIST_CMD="$CARGO_DIST"; fi
+          if [ -z "${DIST_CMD:-}" ]; then cargo install cargo-dist --force --locked; DIST_CMD="$DIST_BIN"; fi
+          echo "DIST_CMD=$DIST_CMD" >> $GITHUB_ENV
+          $DIST_CMD --version
       - name: Build Artifacts
         run: |
-          ${{ env.CARGO_DIST }} build --target ${{ matrix.target }} --tag ${{ github.ref_name }}
+          $DIST_CMD build --target ${{ matrix.target }} --tag ${{ github.ref_name }}
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -101,12 +108,14 @@ jobs:
         run: |
           CARGO_BIN_DIR="${CARGO_HOME:-$HOME/.cargo}/bin"
           CARGO_DIST="$CARGO_BIN_DIR/cargo-dist"
-          if ! command -v cargo-dist >/dev/null 2>&1 && [ ! -x "$CARGO_DIST" ]; then
-            cargo install cargo-dist --force --locked;
-          fi
-          if [ ! -x "$CARGO_DIST" ]; then CARGO_DIST="$(command -v cargo-dist || true)"; fi
-          echo "CARGO_DIST=$CARGO_DIST" >> $GITHUB_ENV
-          "$CARGO_DIST" --version
+          DIST_BIN="$CARGO_BIN_DIR/dist"
+          if command -v dist >/dev/null 2>&1; then DIST_CMD="dist"; fi
+          if [ -x "$DIST_BIN" ]; then DIST_CMD="$DIST_BIN"; fi
+          if command -v cargo-dist >/dev/null 2>&1; then DIST_CMD="cargo-dist"; fi
+          if [ -x "$CARGO_DIST" ]; then DIST_CMD="$CARGO_DIST"; fi
+          if [ -z "${DIST_CMD:-}" ]; then cargo install cargo-dist --force --locked; DIST_CMD="$DIST_BIN"; fi
+          echo "DIST_CMD=$DIST_CMD" >> $GITHUB_ENV
+          $DIST_CMD --version
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -117,7 +126,7 @@ jobs:
           # GitHub-provided token for this repo
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          ${{ env.CARGO_DIST }} upload --tag ${{ github.ref_name }} target/distrib/*
+          $DIST_CMD upload --tag ${{ github.ref_name }} target/distrib/*
 
   publish-tap:
     needs: [plan, upload]
@@ -134,12 +143,14 @@ jobs:
         run: |
           CARGO_BIN_DIR="${CARGO_HOME:-$HOME/.cargo}/bin"
           CARGO_DIST="$CARGO_BIN_DIR/cargo-dist"
-          if ! command -v cargo-dist >/dev/null 2>&1 && [ ! -x "$CARGO_DIST" ]; then
-            cargo install cargo-dist --force --locked;
-          fi
-          if [ ! -x "$CARGO_DIST" ]; then CARGO_DIST="$(command -v cargo-dist || true)"; fi
-          echo "CARGO_DIST=$CARGO_DIST" >> $GITHUB_ENV
-          "$CARGO_DIST" --version
+          DIST_BIN="$CARGO_BIN_DIR/dist"
+          if command -v dist >/dev/null 2>&1; then DIST_CMD="dist"; fi
+          if [ -x "$DIST_BIN" ]; then DIST_CMD="$DIST_BIN"; fi
+          if command -v cargo-dist >/dev/null 2>&1; then DIST_CMD="cargo-dist"; fi
+          if [ -x "$CARGO_DIST" ]; then DIST_CMD="$CARGO_DIST"; fi
+          if [ -z "${DIST_CMD:-}" ]; then cargo install cargo-dist --force --locked; DIST_CMD="$DIST_BIN"; fi
+          echo "DIST_CMD=$DIST_CMD" >> $GITHUB_ENV
+          $DIST_CMD --version
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -154,4 +165,4 @@ jobs:
         run: |
           # Prefer TAP_TOKEN if provided
           if [ -n "${TAP_TOKEN}" ]; then export GITHUB_TOKEN="${TAP_TOKEN}"; fi
-          ${{ env.CARGO_DIST }} publish --installer homebrew --tag ${{ github.ref_name }}
+          $DIST_CMD publish --installer homebrew --tag ${{ github.ref_name }}
