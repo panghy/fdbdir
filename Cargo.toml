@@ -36,6 +36,9 @@ installers = ["homebrew"]
 tap = "panghy/homebrew-tap"
 # CI backends to support
 ci = "github"
+allow-dirty = ["ci"]
+# Enable publishing Homebrew tap via CI
+publish-jobs = ["homebrew"]
 
 # The profile that 'dist' will build with
 [profile.dist]
