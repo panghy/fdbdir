@@ -97,9 +97,12 @@ jobs:
           pattern: artifacts-*
           merge-multiple: true
       - name: Publish Homebrew Tap PR
-        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
         env:
           # Personal Access Token with access to panghy/homebrew-tap
           GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
+          if [ -z "${GITHUB_TOKEN}" ]; then
+            echo "HOMEBREW_TAP_TOKEN not set; skipping tap publish";
+            exit 0;
+          fi
           cargo dist publish --installer homebrew --tag ${{ github.ref_name }}
