@@ -55,7 +55,11 @@ jobs:
           draft: true
           prerelease: false
       - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
+          echo "Have GH_TOKEN? $(test -n \"$GH_TOKEN\" && echo yes || echo no)"
           $DIST_CMD plan --tag ${{ github.ref_name }} --output-format json > dist-plan.json
           echo "dist-version=$(jq -r .dist_version dist-plan.json)" >> $GITHUB_OUTPUT
           echo "tasks=$(jq -c .tasks dist-plan.json)" >> $GITHUB_OUTPUT
@@ -98,6 +102,9 @@ jobs:
           echo "DIST_CMD=$DIST_CMD" >> $GITHUB_ENV
           $DIST_CMD --version
       - name: Build Artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $DIST_CMD build --target ${{ matrix.target }} --tag ${{ github.ref_name }}
       - name: Upload Artifacts
@@ -135,7 +142,7 @@ jobs:
           merge-multiple: true
       - name: Upload to Release
         env:
-          # GitHub-provided token for this repo
+          GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           $DIST_CMD upload --tag ${{ github.ref_name }} target/distrib/*
@@ -170,11 +177,10 @@ jobs:
           merge-multiple: true
       - name: Publish Homebrew Tap PR
         env:
-          # Default repo token (works if tap is same owner and permissions suffice)
+          GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
-          # Optional PAT for cross-repo write; if present will override GITHUB_TOKEN below.
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           # Prefer TAP_TOKEN if provided
-          if [ -n "${TAP_TOKEN}" ]; then export GITHUB_TOKEN="${TAP_TOKEN}"; fi
+          if [ -n "${TAP_TOKEN}" ]; then export GH_TOKEN="${TAP_TOKEN}"; export GITHUB_TOKEN="${TAP_TOKEN}"; fi
           $DIST_CMD publish --installer homebrew --tag ${{ github.ref_name }}
