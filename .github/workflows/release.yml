@@ -83,10 +83,6 @@ jobs:
   publish-tap:
     needs: [plan, upload]
     runs-on: ubuntu-latest
-    # Use env indirection so the if-expression doesn't reference secrets directly.
-    env:
-      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-    if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
     permissions:
       contents: write
       pull-requests: write
@@ -101,6 +97,7 @@ jobs:
           pattern: artifacts-*
           merge-multiple: true
       - name: Publish Homebrew Tap PR
+        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
         env:
           # Personal Access Token with access to panghy/homebrew-tap
           GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
