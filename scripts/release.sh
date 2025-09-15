@@ -43,11 +43,7 @@ if [[ ! -s Cargo.lock ]]; then
 fi
 
 # Commit and tag (include Cargo.lock so CI with --locked won't fail)
-if [ -f Cargo.lock ]; then
-  git add Cargo.toml Cargo.lock
-else
-  git add Cargo.toml
-fi
+git add Cargo.toml Cargo.lock
 git commit -m "release ${TAG}"
 git tag "${TAG}"
 
