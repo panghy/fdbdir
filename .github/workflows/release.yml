@@ -352,7 +352,8 @@ jobs:
           RUST_LOG: "trace"
         run: |
           set -euo pipefail
-          dist -v host ${{ needs.plan.outputs.tag-flag }} --steps=announce --output-format=json > dist-announce.json
+          # Enable verbose logging without breaking subcommand parsing
+          dist --verbose=debug host ${{ needs.plan.outputs.tag-flag }} --steps=announce --output-format=json > dist-announce.json
           echo "--- dist announce output (truncated) ---"
           head -c 20000 dist-announce.json || true
       - name: Upload announce manifest
