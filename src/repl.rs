@@ -175,7 +175,7 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
             "quit" | "exit" => break,
             "pwd" => println!("{}", display_path(&cwd)),
             "cd" => {
-                let target = parts.get(0).map(|s| s.as_str()).unwrap_or("/");
+                let target = parts.first().map(|s| s.as_str()).unwrap_or("/");
                 let new_path = if target == "/" {
                     vec![]
                 } else if target == ".." {
@@ -219,8 +219,8 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
                 let target = parts.first().map(|s| s.as_str());
                 let path = match target {
                     None => cwd.clone(),
-                    Some(p) if p == "." => cwd.clone(),
-                    Some(p) if p == ".." => {
+                    Some(".") => cwd.clone(),
+                    Some("..") => {
                         let mut t = cwd.clone();
                         t.pop();
                         t
