@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Only connect if needed
-    let need_db = cli.interactive || matches!(cli.command, Some(_));
+    let need_db = cli.interactive || cli.command.is_some();
     let (network, db) = if need_db && !cli.no_connect {
         // Safety: we drop the handle at program end
         let network = unsafe { foundationdb::boot() };
