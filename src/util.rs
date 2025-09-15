@@ -223,7 +223,7 @@ pub fn format_bytes(b: &[u8]) -> String {
     out.push_str("b\"");
     for (idx, byte) in b.iter().enumerate() {
         if idx >= MAX {
-            out.push_str("…");
+            out.push('…');
             break;
         }
         if *byte == b'\\' {

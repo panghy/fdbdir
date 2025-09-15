@@ -38,7 +38,7 @@ impl Completer for ReplHelper {
         let is_space_term = line.ends_with(' ');
 
         // If empty or still typing command, complete commands
-        if parts.len() == 0 || (!is_space_term && parts.len() == 1) {
+        if parts.is_empty() || (!is_space_term && parts.len() == 1) {
             let start = 0;
             let prefix = line.trim_start();
             let mut out = vec![];
@@ -71,10 +71,10 @@ impl Completer for ReplHelper {
             };
             // Directory listing for parent and filter on last segment
             let (parent, needle) = if token.ends_with('/') {
-                (base_path.clone(), "".to_string())
+                (base_path.clone(), String::new())
             } else {
                 let mut parent = base_path.clone();
-                let needle = parent.pop().map(|s| s).unwrap_or_default();
+                let needle = parent.pop().unwrap_or_default();
                 (parent, needle)
             };
 
@@ -91,11 +91,9 @@ impl Completer for ReplHelper {
                 })
                 .await
             };
-            let items =
-                match task::block_in_place(|| tokio::runtime::Handle::current().block_on(fut)) {
-                    Ok(v) => v,
-                    Err(_) => vec![],
-                };
+            let items: Vec<String> =
+                task::block_in_place(|| tokio::runtime::Handle::current().block_on(fut))
+                    .unwrap_or_default();
             let mut pairs = vec![];
             let add_slash = token.ends_with('/');
             for name in items {
@@ -111,12 +109,10 @@ impl Completer for ReplHelper {
                         } else {
                             format!("{}{}", base, name)
                         }
+                    } else if add_slash {
+                        format!("{}/", name)
                     } else {
-                        if add_slash {
-                            format!("{}/", name)
-                        } else {
-                            name.clone()
-                        }
+                        name.clone()
                     };
                     pairs.push(Pair {
                         display: format!("{}/", name),
@@ -126,7 +122,7 @@ impl Completer for ReplHelper {
             }
             // start position for replacement: at beginning of last token
             let start = line
-                .rfind(|c| c == ' ' || c == '\t')
+                .rfind(|c| [' ', '\t'].contains(&c))
                 .map(|i| i + 1)
                 .unwrap_or(0);
             return Ok((start, pairs));
@@ -208,7 +204,7 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
                 {
                     Ok(v) => v,
                     Err(e) => {
-                        eprintln!("{} {}", "error:".red().bold(), format!("{:?}", e));
+                        eprintln!("{} {:?}", "error:".red().bold(), e);
                         false
                     }
                 };
@@ -220,7 +216,7 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
                 }
             }
             "ls" => {
-                let target = parts.get(0).map(|s| s.as_str());
+                let target = parts.first().map(|s| s.as_str());
                 let path = match target {
                     None => cwd.clone(),
                     Some(p) if p == "." => cwd.clone(),
@@ -238,7 +234,7 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
                 };
 
                 if let Err(e) = crate::util::ls_path(&db, path).await {
-                    eprintln!("{} {}", "error:".red().bold(), format!("{:?}", e));
+                    eprintln!("{} {:?}", "error:".red().bold(), e);
                 }
             }
             "scan" | "dump" => {
@@ -263,7 +259,7 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
                 }
 
                 if let Err(e) = crate::util::scan_path(&db, cwd.clone(), limit, prefix, raw).await {
-                    eprintln!("{} {}", "error:".red().bold(), format!("{:?}", e));
+                    eprintln!("{} {:?}", "error:".red().bold(), e);
                 }
             }
             other => {
