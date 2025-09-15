@@ -32,11 +32,11 @@ if command -v cargo >/dev/null 2>&1; then
       echo "Error: Failed to generate Cargo.lock file online." >&2
       exit 1
     fi
-    # Verify Cargo.lock exists and is non-empty
-    if [[ ! -s Cargo.lock ]]; then
-      echo "Error: Cargo.lock was not generated or is empty." >&2
-      exit 1
-    fi
+  fi
+  # Verify Cargo.lock exists and is non-empty
+  if [[ ! -s Cargo.lock ]]; then
+    echo "Error: Cargo.lock was not generated or is empty." >&2
+    exit 1
   fi
 fi
 
