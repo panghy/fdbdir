@@ -264,10 +264,11 @@ jobs:
           persist-credentials: false
           submodules: recursive
       # Expose HOMEBREW_TAP_TOKEN to dist directly; it reads this by name
-      - name: Export HOMEBREW_TAP_TOKEN for dist
+      - name: Use HOMEBREW_TAP_TOKEN for GitHub API (tap PRs)
         if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         run: |
-          echo "HOMEBREW_TAP_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
+          echo "GH_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
+          echo "GITHUB_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
@@ -334,10 +335,11 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Export HOMEBREW_TAP_TOKEN for dist
+      - name: Use HOMEBREW_TAP_TOKEN for GitHub API (tap PRs)
         if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         run: |
-          echo "HOMEBREW_TAP_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
+          echo "GH_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
+          echo "GITHUB_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
