@@ -347,5 +347,37 @@ jobs:
           path: ~/.cargo/bin/
       - run: chmod +x ~/.cargo/bin/dist
       - name: Announce (Homebrew PRs, etc.)
+        env:
+          CARGO_DIST_DEBUG: "1"
+          RUST_LOG: "trace"
         run: |
-          dist host ${{ needs.plan.outputs.tag-flag }} --steps=announce --output-format=json > dist-announce.json
+          set -euo pipefail
+          dist -v host ${{ needs.plan.outputs.tag-flag }} --steps=announce --output-format=json > dist-announce.json
+          echo "--- dist announce output (truncated) ---"
+          head -c 20000 dist-announce.json || true
+      - name: Upload announce manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-dist-announce
+          path: dist-announce.json
+      - name: Assert Homebrew PR created (fail loud)
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
+        env:
+          TAP_REPO: panghy/homebrew-tap
+        run: |
+          set -euo pipefail
+          if rg -n "publish-jobs\s*=.*homebrew" dist-workspace.toml >/dev/null; then
+            echo "Homebrew publishing enabled; verifying PR exists in ${TAP_REPO}..."
+            # Look for an open PR mentioning this repo/package in title
+            PR_URL=$(gh pr list -R "$TAP_REPO" --state open --search "fdbdir in:title" --json url -q '.[0].url' || true)
+            if [ -z "${PR_URL}" ]; then
+              echo "::error::No open Homebrew PR found in ${TAP_REPO}. cargo-dist announce likely failed silently." >&2
+              echo "Hint: Ensure HOMEBREW_TAP_TOKEN has repo scope and access to ${TAP_REPO}." >&2
+              echo "Also check dist-announce.json artifact for detailed logs." >&2
+              exit 1
+            else
+              echo "Found Homebrew PR: ${PR_URL}"
+            fi
+          else
+            echo "Homebrew publishing not enabled; skipping assertion."
+          fi
