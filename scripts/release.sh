@@ -25,19 +25,21 @@ awk -v ver="$VERSION_INPUT" '
 ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 
 # Regenerate lockfile to reflect the new local package version without changing deps
-if command -v cargo >/dev/null 2>&1; then
-  # Prefer offline to avoid network; fall back to online if needed
-  if ! cargo generate-lockfile --offline >/dev/null 2>&1; then
-    if ! cargo generate-lockfile >/dev/null 2>&1; then
-      echo "Error: Failed to generate Cargo.lock file (tried both offline and online modes)." >&2
-      exit 1
-    fi
-  fi
-  # Verify Cargo.lock exists and is non-empty
-  if [[ ! -s Cargo.lock ]]; then
-    echo "Error: Cargo.lock was not generated or is empty." >&2
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "Error: 'cargo' command not found. This script requires cargo to release Rust projects." >&2
+  exit 1
+fi
+# Prefer offline to avoid network; fall back to online if needed
+if ! cargo generate-lockfile --offline >/dev/null 2>&1; then
+  if ! cargo generate-lockfile >/dev/null 2>&1; then
+    echo "Error: Failed to generate Cargo.lock file (tried both offline and online modes)." >&2
     exit 1
   fi
+fi
+# Verify Cargo.lock exists and is non-empty
+if [[ ! -s Cargo.lock ]]; then
+  echo "Error: Cargo.lock was not generated or is empty." >&2
+  exit 1
 fi
 
 # Commit and tag (include Cargo.lock so CI with --locked won't fail)
