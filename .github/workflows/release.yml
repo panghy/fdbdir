@@ -254,6 +254,7 @@ jobs:
     if: ${{ always() && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.host.outputs.manifest }}
@@ -262,15 +263,11 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Use PAT for cross-repo access (optional)
-        shell: bash
-        env:
-          DEFAULT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      # Expose HOMEBREW_TAP_TOKEN to dist directly; it reads this by name
+      - name: Export HOMEBREW_TAP_TOKEN for dist
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         run: |
-          TOK="$DEFAULT_TOKEN"; if [ -n "$TAP_TOKEN" ]; then TOK="$TAP_TOKEN"; fi
-          echo "GH_TOKEN=${TOK}" >> $GITHUB_ENV
-          echo "GITHUB_TOKEN=${TOK}" >> $GITHUB_ENV
+          echo "HOMEBREW_TAP_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
@@ -331,20 +328,16 @@ jobs:
     runs-on: "ubuntu-22.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Use PAT for cross-repo access (optional)
-        shell: bash
-        env:
-          DEFAULT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      - name: Export HOMEBREW_TAP_TOKEN for dist
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         run: |
-          TOK="$DEFAULT_TOKEN"; if [ -n "$TAP_TOKEN" ]; then TOK="$TAP_TOKEN"; fi
-          echo "GH_TOKEN=${TOK}" >> $GITHUB_ENV
-          echo "GITHUB_TOKEN=${TOK}" >> $GITHUB_ENV
+          echo "HOMEBREW_TAP_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
@@ -354,3 +347,66 @@ jobs:
       - name: Announce (Homebrew PRs, etc.)
         run: |
           dist host ${{ needs.plan.outputs.tag-flag }} --steps=announce --output-format=json > dist-announce.json
+
+  publish-homebrew-manual:
+    name: publish-homebrew (manual fallback)
+    needs:
+      - plan
+      - build-global-artifacts
+      - host
+    if: ${{ always() && needs.host.result == 'success' }}
+    runs-on: ubuntu-22.04
+    env:
+      DEFAULT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      TAG_NAME: ${{ needs.plan.outputs.tag }}
+    steps:
+      - name: Select token
+        id: toks
+        run: |
+          TOK="$DEFAULT_TOKEN"; if [ -n "$TAP_TOKEN" ]; then TOK="$TAP_TOKEN"; fi
+          echo "tok=$TOK" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch artifacts (for formula)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          path: artifacts
+          merge-multiple: true
+      - name: Locate formula
+        id: formula
+        shell: bash
+        run: |
+          set -euo pipefail
+          FORMULA_FILE=$(ls artifacts/**/homebrew/*.rb 2>/dev/null | head -n1 || true)
+          if [ -z "$FORMULA_FILE" ]; then
+            FORMULA_FILE=$(ls artifacts/**/*.rb 2>/dev/null | head -n1 || true)
+          fi
+          if [ -z "$FORMULA_FILE" ]; then
+            echo "No Homebrew formula found in artifacts; skipping."; exit 0;
+          fi
+          echo "path=$FORMULA_FILE" >> $GITHUB_OUTPUT
+      - name: Clone tap and open PR
+        if: steps.formula.outputs.path != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.toks.outputs.tok }}
+        run: |
+          set -euo pipefail
+          FORMULA="${{ steps.formula.outputs.path }}"
+          WORKDIR=$(mktemp -d)
+          echo "Cloning tap repo..."
+          git clone "https://github.com/panghy/homebrew-tap.git" "$WORKDIR/tap"
+          cd "$WORKDIR/tap"
+          BR="dist-release-${TAG_NAME:-update}"
+          git checkout -b "$BR"
+          mkdir -p Formula
+          cp "$GITHUB_WORKSPACE/$FORMULA" Formula/fdbdir.rb
+          git add Formula/fdbdir.rb
+          git -c user.name="dist-bot" -c user.email="dist-bot@users.noreply.github.com" commit -m "fdbdir ${TAG_NAME}: update Homebrew formula"
+          echo "Pushing branch..."
+          git push -u origin "$BR"
+          echo "Creating PR..."
+          gh pr create -R panghy/homebrew-tap -H "$BR" -B main -t "fdbdir ${TAG_NAME}" -b "Automated formula update for ${TAG_NAME}."
