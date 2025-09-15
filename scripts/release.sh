@@ -41,7 +41,11 @@ if command -v cargo >/dev/null 2>&1; then
 fi
 
 # Commit and tag (include Cargo.lock so CI with --locked won't fail)
-git add Cargo.toml Cargo.lock
+if [ -f Cargo.lock ]; then
+  git add Cargo.toml Cargo.lock
+else
+  git add Cargo.toml
+fi
 git commit -m "release ${TAG}"
 git tag "${TAG}"
 
