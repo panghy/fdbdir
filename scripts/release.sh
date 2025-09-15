@@ -29,7 +29,7 @@ if command -v cargo >/dev/null 2>&1; then
   # Prefer offline to avoid network; fall back to online if needed
   if ! cargo generate-lockfile --offline >/dev/null 2>&1; then
     if ! cargo generate-lockfile >/dev/null 2>&1; then
-      echo "Error: Failed to generate Cargo.lock file online." >&2
+      echo "Error: Failed to generate Cargo.lock file (tried both offline and online modes)." >&2
       exit 1
     fi
   fi
