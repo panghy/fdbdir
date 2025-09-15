@@ -1,16 +1,16 @@
 use crate::util::{display_path, parse_path};
 use anyhow::Result;
-use foundationdb::directory::{DirectoryLayer, Directory};
-use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use foundationdb::directory::{Directory, DirectoryLayer};
+use owo_colors::OwoColorize;
 use rustyline::completion::{Completer, Pair};
+use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
-use rustyline::{Helper, Context};
-use std::sync::{Arc, Mutex};
+use rustyline::Editor;
+use rustyline::{Context, Helper};
 use std::path::PathBuf;
-use owo_colors::OwoColorize;
+use std::sync::{Arc, Mutex};
 use tokio::task;
 
 struct ReplHelper {
@@ -27,7 +27,12 @@ impl Hinter for ReplHelper {
 
 impl Completer for ReplHelper {
     type Candidate = Pair;
-    fn complete(&self, line: &str, _pos: usize, _ctx: &Context<'_>) -> rustyline::Result<(usize, Vec<Pair>)> {
+    fn complete(
+        &self,
+        line: &str,
+        _pos: usize,
+        _ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
         let commands = ["help", "exit", "quit", "pwd", "cd", "ls", "scan"];
         let parts = shell_words::split(line).unwrap_or_else(|_| vec![line.to_string()]);
         let is_space_term = line.ends_with(' ');
@@ -39,7 +44,10 @@ impl Completer for ReplHelper {
             let mut out = vec![];
             for &cmd in &commands {
                 if cmd.starts_with(prefix) {
-                    out.push(Pair { display: cmd.to_string(), replacement: cmd.to_string() });
+                    out.push(Pair {
+                        display: cmd.to_string(),
+                        replacement: cmd.to_string(),
+                    });
                 }
             }
             return Ok((start, out));
@@ -49,7 +57,11 @@ impl Completer for ReplHelper {
         let cmd = &parts[0];
         if ["cd", "ls", "scan"].contains(&cmd.as_str()) {
             // Determine current (possibly partial) token
-            let token = if is_space_term { "" } else { parts.last().map(|s| s.as_str()).unwrap_or("") };
+            let token = if is_space_term {
+                ""
+            } else {
+                parts.last().map(|s| s.as_str()).unwrap_or("")
+            };
             let base_path = if token.starts_with('/') {
                 parse_path(token)
             } else {
@@ -58,7 +70,9 @@ impl Completer for ReplHelper {
                 p
             };
             // Directory listing for parent and filter on last segment
-            let (parent, needle) = if token.ends_with('/') { (base_path.clone(), "".to_string()) } else {
+            let (parent, needle) = if token.ends_with('/') {
+                (base_path.clone(), "".to_string())
+            } else {
                 let mut parent = base_path.clone();
                 let needle = parent.pop().map(|s| s).unwrap_or_default();
                 (parent, needle)
@@ -74,27 +88,47 @@ impl Completer for ReplHelper {
                         let items = dl.list(&trx, &parent).await?;
                         Ok::<_, foundationdb::FdbBindingError>(items)
                     }
-                }).await
+                })
+                .await
             };
-            let items = match task::block_in_place(|| tokio::runtime::Handle::current().block_on(fut)) {
-                Ok(v) => v,
-                Err(_) => vec![],
-            };
+            let items =
+                match task::block_in_place(|| tokio::runtime::Handle::current().block_on(fut)) {
+                    Ok(v) => v,
+                    Err(_) => vec![],
+                };
             let mut pairs = vec![];
             let add_slash = token.ends_with('/');
             for name in items {
                 if needle.is_empty() || name.starts_with(&needle) {
                     let rep = if token.starts_with('/') {
-                        let base = if parent.is_empty() { String::from("/") } else { format!("/{}/", parent.join("/")) };
-                        if add_slash { format!("{}{}/", base, name) } else { format!("{}{}", base, name) }
+                        let base = if parent.is_empty() {
+                            String::from("/")
+                        } else {
+                            format!("/{}/", parent.join("/"))
+                        };
+                        if add_slash {
+                            format!("{}{}/", base, name)
+                        } else {
+                            format!("{}{}", base, name)
+                        }
                     } else {
-                        if add_slash { format!("{}/", name) } else { name.clone() }
+                        if add_slash {
+                            format!("{}/", name)
+                        } else {
+                            name.clone()
+                        }
                     };
-                    pairs.push(Pair { display: format!("{}/", name), replacement: rep });
+                    pairs.push(Pair {
+                        display: format!("{}/", name),
+                        replacement: rep,
+                    });
                 }
             }
             // start position for replacement: at beginning of last token
-            let start = line.rfind(|c| c == ' ' || c == '\t').map(|i| i + 1).unwrap_or(0);
+            let start = line
+                .rfind(|c| c == ' ' || c == '\t')
+                .map(|i| i + 1)
+                .unwrap_or(0);
             return Ok((start, pairs));
         }
 
@@ -106,7 +140,10 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
     let db = Arc::new(db);
     let mut rl: Editor<ReplHelper, _> = Editor::new()?;
     let cwd_shared: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
-    let helper: ReplHelper = ReplHelper { db: db.clone(), cwd: cwd_shared.clone() };
+    let helper: ReplHelper = ReplHelper {
+        db: db.clone(),
+        cwd: cwd_shared.clone(),
+    };
     rl.set_helper(Some(helper));
 
     // History file path: ~/.fdbdir_history
@@ -143,10 +180,19 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
             "pwd" => println!("{}", display_path(&cwd)),
             "cd" => {
                 let target = parts.get(0).map(|s| s.as_str()).unwrap_or("/");
-                let new_path = if target == "/" { vec![] }
-                else if target == ".." { let mut p = cwd.clone(); p.pop(); p }
-                else if target.starts_with('/') { parse_path(target) }
-                else { let mut p = cwd.clone(); p.extend(parse_path(target)); p };
+                let new_path = if target == "/" {
+                    vec![]
+                } else if target == ".." {
+                    let mut p = cwd.clone();
+                    p.pop();
+                    p
+                } else if target.starts_with('/') {
+                    parse_path(target)
+                } else {
+                    let mut p = cwd.clone();
+                    p.extend(parse_path(target));
+                    p
+                };
 
                 // Validate by attempting to open
                 let ok = match db
@@ -158,10 +204,14 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
                             Ok(exists)
                         }
                     })
-                    .await {
-                        Ok(v) => v,
-                        Err(e) => { eprintln!("{} {}", "error:".red().bold(), format!("{:?}", e)); false }
-                    };
+                    .await
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        eprintln!("{} {}", "error:".red().bold(), format!("{:?}", e));
+                        false
+                    }
+                };
                 if ok {
                     cwd = new_path;
                     *cwd_shared.lock().unwrap() = cwd.clone();
@@ -174,9 +224,17 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
                 let path = match target {
                     None => cwd.clone(),
                     Some(p) if p == "." => cwd.clone(),
-                    Some(p) if p == ".." => { let mut t = cwd.clone(); t.pop(); t }
+                    Some(p) if p == ".." => {
+                        let mut t = cwd.clone();
+                        t.pop();
+                        t
+                    }
                     Some(p) if p.starts_with('/') => parse_path(p),
-                    Some(p) => { let mut t = cwd.clone(); t.extend(parse_path(p)); t }
+                    Some(p) => {
+                        let mut t = cwd.clone();
+                        t.extend(parse_path(p));
+                        t
+                    }
                 };
 
                 if let Err(e) = crate::util::ls_path(&db, path).await {
@@ -189,10 +247,18 @@ pub async fn run_repl(db: foundationdb::Database) -> Result<()> {
                 let mut prefix: Option<Vec<u8>> = None;
                 let mut raw = false;
                 for tok in parts.iter() {
-                    if tok == "--raw" || tok == "-r" || tok == "raw" { raw = true; continue; }
-                    if let Ok(n) = tok.parse::<usize>() { limit = n; continue; }
+                    if tok == "--raw" || tok == "-r" || tok == "raw" {
+                        raw = true;
+                        continue;
+                    }
+                    if let Ok(n) = tok.parse::<usize>() {
+                        limit = n;
+                        continue;
+                    }
                     if prefix.is_none() {
-                        if let Ok(b) = crate::util::parse_bytes_literal(tok) { prefix = Some(b); }
+                        if let Ok(b) = crate::util::parse_bytes_literal(tok) {
+                            prefix = Some(b);
+                        }
                     }
                 }
 

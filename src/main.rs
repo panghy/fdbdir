@@ -66,7 +66,9 @@ async fn main() -> Result<()> {
     };
 
     if cli.interactive {
-        let db = db.ok_or_else(|| anyhow::anyhow!("interactive mode requires a connection; omit --no-connect"))?;
+        let db = db.ok_or_else(|| {
+            anyhow::anyhow!("interactive mode requires a connection; omit --no-connect")
+        })?;
         repl::run_repl(db).await?;
         drop(network);
         return Ok(());
@@ -74,13 +76,31 @@ async fn main() -> Result<()> {
 
     match cli.command.unwrap() {
         Commands::Ls { path } => {
-            let db = db.ok_or_else(|| anyhow::anyhow!("ls requires a connection; omit --no-connect"))?;
+            let db =
+                db.ok_or_else(|| anyhow::anyhow!("ls requires a connection; omit --no-connect"))?;
             util::ls_path(&db, util::parse_path(path.as_deref().unwrap_or("/"))).await?;
         }
-        Commands::Scan { path, limit, prefix, raw } => {
-            let db = db.ok_or_else(|| anyhow::anyhow!("scan requires a connection; omit --no-connect"))?;
-            let prefix_bytes = if let Some(s) = prefix { Some(util::parse_bytes_literal(&s)?) } else { None };
-            util::scan_path(&db, util::parse_path(path.as_deref().unwrap_or("/")), limit, prefix_bytes, raw).await?;
+        Commands::Scan {
+            path,
+            limit,
+            prefix,
+            raw,
+        } => {
+            let db =
+                db.ok_or_else(|| anyhow::anyhow!("scan requires a connection; omit --no-connect"))?;
+            let prefix_bytes = if let Some(s) = prefix {
+                Some(util::parse_bytes_literal(&s)?)
+            } else {
+                None
+            };
+            util::scan_path(
+                &db,
+                util::parse_path(path.as_deref().unwrap_or("/")),
+                limit,
+                prefix_bytes,
+                raw,
+            )
+            .await?;
         }
     }
     drop(network);
