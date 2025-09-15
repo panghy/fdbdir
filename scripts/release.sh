@@ -24,8 +24,16 @@ awk -v ver="$VERSION_INPUT" '
   { print }
 ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 
-# Commit and tag
-git add Cargo.toml
+# Regenerate lockfile to reflect the new local package version without changing deps
+if command -v cargo >/dev/null 2>&1; then
+  # Prefer offline to avoid network; fall back to online if needed
+  if ! cargo generate-lockfile --offline >/dev/null 2>&1; then
+    cargo generate-lockfile >/dev/null 2>&1 || true
+  fi
+fi
+
+# Commit and tag (include Cargo.lock so CI with --locked won't fail)
+git add Cargo.toml Cargo.lock
 git commit -m "release ${TAG}"
 git tag "${TAG}"
 
