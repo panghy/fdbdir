@@ -353,7 +353,7 @@ jobs:
         run: |
           set -euo pipefail
           # Enable verbose logging without breaking subcommand parsing
-          dist --verbose=debug host ${{ needs.plan.outputs.tag-flag }} --steps=announce --output-format=json > dist-announce.json
+          dist host ${{ needs.plan.outputs.tag-flag }} --steps=announce --output-format=json > dist-announce.json
           echo "--- dist announce output (truncated) ---"
           head -c 20000 dist-announce.json || true
       - name: Upload announce manifest
