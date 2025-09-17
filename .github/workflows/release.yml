@@ -361,24 +361,57 @@ jobs:
         with:
           name: artifacts-dist-announce
           path: dist-announce.json
-      - name: Assert Homebrew PR created (fail loud)
+      - name: Ensure Homebrew PR (fallback if missing)
         if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
         env:
           TAP_REPO: panghy/homebrew-tap
+          TAG: ${{ needs.plan.outputs.tag }}
         run: |
           set -euo pipefail
-          if grep -E -q 'publish-jobs\s*=.*homebrew' dist-workspace.toml; then
-            echo "Homebrew publishing enabled; verifying PR exists in ${TAP_REPO}..."
-            # Look for an open PR mentioning this repo/package in title
-            PR_URL=$(gh pr list -R "$TAP_REPO" --state open --search "fdbdir in:title" --json url -q '.[0].url' || true)
-            if [ -z "${PR_URL}" ]; then
-              echo "::error::No open Homebrew PR found in ${TAP_REPO}. cargo-dist announce likely failed silently." >&2
-              echo "Hint: Ensure HOMEBREW_TAP_TOKEN has repo scope AND Contents: write on ${TAP_REPO}." >&2
-              echo "Also check dist-announce.json artifact for detailed logs." >&2
-              exit 1
-            else
-              echo "Found Homebrew PR: ${PR_URL}"
-            fi
-          else
-            echo "Homebrew publishing not enabled; skipping assertion."
+          if ! grep -E -q 'publish-jobs\s*=.*homebrew' dist-workspace.toml; then
+            echo "Homebrew publishing not enabled; skipping."
+            exit 0
           fi
+
+          echo "Checking for existing tap PR in ${TAP_REPO}..."
+          PR_URL=$(gh pr list -R "$TAP_REPO" --state open --search "fdbdir in:title ${TAG}" --json url -q '.[0].url' || true)
+          if [ -n "${PR_URL}" ]; then
+            echo "Found Homebrew PR: ${PR_URL}"
+            exit 0
+          fi
+
+          echo "No PR found. Falling back to manual publish via gh..."
+          WORKDIR="$RUNNER_TEMP/homebrew"
+          mkdir -p "$WORKDIR"
+          echo "Downloading formula from release ${TAG}..."
+          gh release download "${TAG}" --pattern "fdbdir.rb" --dir "$WORKDIR"
+          if [ ! -f "$WORKDIR/fdbdir.rb" ]; then
+            echo "::error::Missing fdbdir.rb in release ${TAG}; cannot publish Homebrew formula." >&2
+            exit 1
+          fi
+
+          echo "Cloning tap repo ${TAP_REPO}..."
+          TAP_DIR="$RUNNER_TEMP/tap"
+          rm -rf "$TAP_DIR"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${TAP_REPO}.git" "$TAP_DIR"
+          cd "$TAP_DIR"
+          BRANCH="fdbdir-${TAG}"
+          git checkout -b "$BRANCH" || git checkout "$BRANCH"
+          mkdir -p Formula
+          cp "$WORKDIR/fdbdir.rb" Formula/fdbdir.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/fdbdir.rb
+          git commit -m "fdbdir ${TAG}" || echo "Nothing to commit (unchanged)"
+          git push -u origin "$BRANCH" --force
+          # Create PR (idempotent)
+          if gh pr view -R "$TAP_REPO" "$BRANCH" >/dev/null 2>&1; then
+            PR_URL=$(gh pr view -R "$TAP_REPO" "$BRANCH" --json url -q .url)
+          else
+            PR_URL=$(gh pr create -R "$TAP_REPO" -H "$BRANCH" -B main --title "fdbdir ${TAG}" --body "Update fdbdir Homebrew formula for ${TAG}" | tail -n1 || true)
+          fi
+          if [ -z "${PR_URL}" ]; then
+            echo "::error::Failed to open Homebrew PR in ${TAP_REPO}." >&2
+            exit 1
+          fi
+          echo "Created Homebrew PR: ${PR_URL}"
