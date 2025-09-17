@@ -408,7 +408,7 @@ jobs:
           if gh pr view -R "$TAP_REPO" "$BRANCH" >/dev/null 2>&1; then
             PR_URL=$(gh pr view -R "$TAP_REPO" "$BRANCH" --json url -q .url)
           else
-            PR_URL=$(gh pr create -R "$TAP_REPO" -H "$BRANCH" -B main --title "fdbdir ${TAG}" --body "Update fdbdir Homebrew formula for ${TAG}" | tail -n1 || true)
+            PR_URL=$(gh pr create -R "$TAP_REPO" -H "$BRANCH" -B main --title "fdbdir ${TAG}" --body "Update fdbdir Homebrew formula for ${TAG}" --json url -q .url || true)
           fi
           if [ -z "${PR_URL}" ]; then
             echo "::error::Failed to open Homebrew PR in ${TAP_REPO}." >&2
