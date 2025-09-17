@@ -1,6 +1,6 @@
 [package]
 name = "fdbdir"
-version = "0.1.24"
+version = "0.1.25"
 edition = "2021"
 description = "FoundationDB Directory Explorer CLI (interactive REPL with tuple decoding)"
 repository = "https://github.com/panghy/fdbdir"
