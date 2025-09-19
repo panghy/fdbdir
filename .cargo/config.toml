@@ -1,0 +1,20 @@
+# Ensure fdbdir can find FoundationDB client libraries in typical locations.
+# macOS: official pkg -> /usr/local/lib; Homebrew libs -> /opt/homebrew/lib
+# Linux (Debian/Ubuntu): /usr/lib and /usr/lib/x86_64-linux-gnu
+[target.aarch64-apple-darwin]
+rustflags = [
+  "-C", "link-arg=-Wl,-rpath,/usr/local/lib",
+  "-C", "link-arg=-Wl,-rpath,/opt/homebrew/lib",
+]
+
+[target.x86_64-apple-darwin]
+rustflags = [
+  "-C", "link-arg=-Wl,-rpath,/usr/local/lib",
+  "-C", "link-arg=-Wl,-rpath,/opt/homebrew/lib",
+]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+  "-C", "link-arg=-Wl,-rpath,/usr/lib",
+  "-C", "link-arg=-Wl,-rpath,/usr/lib/x86_64-linux-gnu",
+]
