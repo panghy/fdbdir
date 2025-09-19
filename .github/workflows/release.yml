@@ -264,11 +264,8 @@ jobs:
           persist-credentials: false
           submodules: recursive
       # Expose HOMEBREW_TAP_TOKEN to dist directly; it reads this by name
-      - name: Use HOMEBREW_TAP_TOKEN for GitHub API (tap PRs)
-        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
-        run: |
-          echo "GH_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
-          echo "GITHUB_TOKEN=${HOMEBREW_TAP_TOKEN}" >> $GITHUB_ENV
+      # Note: cargo-dist reads HOMEBREW_TAP_TOKEN directly; avoid globally overriding GH/GITHUB_TOKEN
+      # so we can still access this repo's releases with the default Actions token.
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
@@ -386,7 +383,8 @@ jobs:
           WORKDIR="$RUNNER_TEMP/homebrew"
           mkdir -p "$WORKDIR"
           echo "Downloading formula from release ${TAG}..."
-          gh release download "${TAG}" --pattern "fdbdir.rb" --dir "$WORKDIR"
+          # Use default Actions token to download from source repo
+          GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" gh release download "${TAG}" --pattern "fdbdir.rb" --dir "$WORKDIR"
           if [ ! -f "$WORKDIR/fdbdir.rb" ]; then
             echo "::error::Missing fdbdir.rb in release ${TAG}; cannot publish Homebrew formula." >&2
             exit 1
@@ -411,10 +409,10 @@ jobs:
           fi
           git push -u origin "$BRANCH" --force
           # Create PR (idempotent)
-          if gh pr view -R "$TAP_REPO" "$BRANCH" >/dev/null 2>&1; then
-            PR_URL=$(gh pr view -R "$TAP_REPO" "$BRANCH" --json url -q .url)
+          if GH_TOKEN="${HOMEBREW_TAP_TOKEN}" gh pr view -R "$TAP_REPO" "$BRANCH" >/dev/null 2>&1; then
+            PR_URL=$(GH_TOKEN="${HOMEBREW_TAP_TOKEN}" gh pr view -R "$TAP_REPO" "$BRANCH" --json url -q .url)
           else
-            PR_URL=$(gh pr create -R "$TAP_REPO" -H "$BRANCH" -B main --title "fdbdir ${TAG}" --body "Update fdbdir Homebrew formula for ${TAG}" --json url -q .url || true)
+            PR_URL=$(GH_TOKEN="${HOMEBREW_TAP_TOKEN}" gh pr create -R "$TAP_REPO" -H "$BRANCH" -B main --title "fdbdir ${TAG}" --body "Update fdbdir Homebrew formula for ${TAG}" 2>/dev/null || true)
           fi
           if [ -z "${PR_URL}" ]; then
             echo "::error::Failed to open Homebrew PR in ${TAP_REPO}." >&2
