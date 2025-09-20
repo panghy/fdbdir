@@ -51,8 +51,12 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // Default to interactive mode when no subcommand/flags are provided.
+    // This matches typical CLI REPL expectations and avoids panicking on None.
+    let default_repl = !cli.interactive && cli.command.is_none();
+
     // Only connect if needed
-    let need_db = cli.interactive || cli.command.is_some();
+    let need_db = cli.interactive || default_repl || cli.command.is_some();
     let (network, db) = if need_db && !cli.no_connect {
         // Safety: we drop the handle at program end
         let network = unsafe { foundationdb::boot() };
@@ -65,7 +69,7 @@ async fn main() -> Result<()> {
         (None, None)
     };
 
-    if cli.interactive {
+    if cli.interactive || default_repl {
         let db = db.ok_or_else(|| {
             anyhow::anyhow!("interactive mode requires a connection; omit --no-connect")
         })?;
